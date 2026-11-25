@@ -1,0 +1,6 @@
+{
+  "name": "dpdfnet-vst2",
+  "version-string": "1.0.0",
+  "builtin-baseline": "7281d8d64321f945f296e696d8561f68c8186c67",
+  "dependencies": ["onnxruntime"]
+}

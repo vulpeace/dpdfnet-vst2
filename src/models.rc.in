@@ -1,0 +1,10 @@
+#include <windows.h>
+
+101 RCDATA "@DPDF8_MODEL@"
+
+103 DIALOGEX 0, 0, 160, 43
+STYLE WS_CHILD | DS_CONTROL
+BEGIN
+  AUTOCHECKBOX "Bypass", 1001, 8, 8, 80, 12
+  LTEXT "Engine: waiting for audio", 1003, 8, 25, 142, 12
+END
