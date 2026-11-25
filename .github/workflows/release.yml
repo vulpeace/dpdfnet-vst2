@@ -1,0 +1,76 @@
+name: Release Windows VST2
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Build Windows x64 plug-in
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:GITHUB_REF_NAME -cnotmatch '^v[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?$') {
+              throw 'Expected a release tag such as v1.0.0.'
+          }
+
+          $package = Join-Path $PWD 'build-release/onnxruntime-package'
+          $zip = "$package.zip"
+          $expected = 'a9150bc2992cbbb6722070da9910e1ffa989a8bfc67bdd5bb8e745ca755641db'
+          New-Item -ItemType Directory -Force (Split-Path $package) | Out-Null
+          curl.exe --fail --location --retry 3 --output "$zip" 'https://api.nuget.org/v3-flatcontainer/microsoft.ml.onnxruntime/1.32.0/microsoft.ml.onnxruntime.1.32.0.nupkg'
+          if ($LASTEXITCODE -ne 0) { throw 'ONNX Runtime download failed.' }
+          if ((Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash -ne $expected) {
+              throw 'ONNX Runtime package SHA-256 mismatch.'
+          }
+          Expand-Archive -LiteralPath $zip -DestinationPath $package -Force
+
+          cmake -S . -B build-release -G 'Visual Studio 17 2022' -A x64 "-DONNXRUNTIME_NUGET_ROOT=$package"
+          if ($LASTEXITCODE -ne 0) { throw 'CMake configure failed.' }
+          cmake --build build-release --config Release
+          if ($LASTEXITCODE -ne 0) { throw 'Release build failed.' }
+
+      - name: Package plug-in and notices
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $staging = 'build-release/package'
+          $artifact = "DPDFNet-${env:GITHUB_REF_NAME}-windows-x64"
+          New-Item -ItemType Directory -Force "$staging/licenses" | Out-Null
+          Copy-Item -LiteralPath 'build-release/Release/DPDFNet.dll',
+            'build-release/Release/onnxruntime.dll',
+            'build-release/Release/onnxruntime_providers_shared.dll' -Destination $staging
+          ./scripts/fetch-native-weights.ps1 -Destination $staging
+          Copy-Item -LiteralPath 'README.md', 'LICENSE', 'THIRD_PARTY.md' -Destination $staging
+          Copy-Item -LiteralPath 'licenses/Apache-2.0.txt' -Destination "$staging/licenses"
+          Copy-Item -LiteralPath 'build-release/onnxruntime-package/LICENSE' -Destination "$staging/licenses/ONNX-Runtime-LICENSE.txt"
+          Copy-Item -LiteralPath 'build-release/onnxruntime-package/ThirdPartyNotices.txt' -Destination "$staging/licenses/ONNX-Runtime-ThirdPartyNotices.txt"
+
+          $zip = "$artifact.zip"
+          $entries = Get-ChildItem -LiteralPath $staging -Name
+          tar.exe -a -cf $zip -C $staging $entries
+          if ($LASTEXITCODE -ne 0) { throw 'Release archive creation failed.' }
+          $hash = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $zip" | Set-Content -LiteralPath "$zip.sha256" -Encoding ascii
+
+      - name: Publish GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          $zip = "DPDFNet-$tag-windows-x64.zip"
+          $options = @('--verify-tag', '--generate-notes')
+          if ($tag.Contains('-')) { $options += '--prerelease' }
+          gh release create $tag $zip "$zip.sha256" @options
+          exit $LASTEXITCODE

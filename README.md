@@ -2,6 +2,10 @@
 
 DPDFNet is a 64-bit Windows VST2.4 noise suppression plug-in. It mixes stereo input to mono, denoises the mix with DPDFNet8 48 kHz HR, and sends the same signal to both outputs. The editor shows the active inference engine and offers **Bypass**, which preserves stereo and compensates for the processing delay.
 
+## Install a release
+
+Extract the Windows x64 release ZIP and copy `DPDFNet.dll`, `onnxruntime.dll`, `onnxruntime_providers_shared.dll`, and `dpdfnet8_48khz_hr.weights.f32` into the same VST2 plug-in directory. Rescan in the host. The editor shows **Native INT8** when the native backend is in use or **ONNX Runtime** when the fallback is active.
+
 ## Build on Windows
 
 Install Visual Studio with **Desktop development with C++** and CMake. The examples use the Visual Studio 2026 generator. For Visual Studio 2022, use `Visual Studio 17 2022` in both configure commands. Run the commands from the repository root in PowerShell.
@@ -51,3 +55,9 @@ For the static build, use `build/Release` as the destination. The plug-in checks
 ## Licenses
 
 The plug-in and DSP adapted from Outsidepro Arts' VST3 project are covered by the [MIT license](LICENSE). The bundled [Ceva-IP DPDFNet8 model](https://github.com/ceva-ip/DPDFNet), [native runtime](third_party/dpdf-native/README.md), and the resampler components with Apache notices use the [Apache License 2.0](licenses/Apache-2.0.txt). ONNX Runtime is supplied separately and carries its own license and third-party notices.
+
+See [third-party notices](THIRD_PARTY.md) for attribution and details about the packed native weights.
+
+## Publish a release
+
+Push a version tag such as `v1.0.0` to run the [release workflow](.github/workflows/release.yml). It builds the Windows x64 plug-in, verifies the runtime package and native weights, and attaches a ZIP and SHA-256 checksum to a GitHub Release. Tags such as `v1.0.0-rc.1` publish as prereleases.
